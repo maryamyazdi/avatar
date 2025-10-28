@@ -1,5 +1,7 @@
 import logging
 import os
+import json
+import re
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -30,6 +32,12 @@ project_root = Path(__file__).resolve().parents[2]
 env_file = project_root / ".env"
 load_dotenv(env_file)
 
+# Tool registry - maps function names to actual functions
+TOOL_REGISTRY = {
+    "get_weather": get_weather,
+    "search_and_respond": search_and_respond,
+}
+
 # Speech-to-Text (Whisper) Configuration
 WHISPER_BASE_URL = os.getenv("WHISPER_BASE_URL")
 WHISPER_LANGUAGE = os.getenv("WHISPER_LANGUAGE")
@@ -53,6 +61,64 @@ VAD_MIN_SILENCE_DURATION = os.getenv("VAD_MIN_SILENCE_DURATION", "0.5")
 VAD_PREFIX_PADDING = os.getenv("VAD_PREFIX_PADDING", "0.2")
 VAD_MAX_BUFFERED_SPEECH = os.getenv("VAD_MAX_BUFFERED_SPEECH", "30.0")
 
+
+
+def parse_and_execute_tool_calls(content: str):
+    """
+    Detects tool calls in format: $tool_calls [...] $
+    """
+    if not isinstance(content, list) or len(content) == 0:
+        return None
+    
+    text = content[0] if isinstance(content[0], str) else str(content[0])
+    
+    if not text.startswith("$tool_calls"):
+        return None
+    
+    try:
+        # Extract JSON array from the pattern: $tool_calls\n[...]\n$
+        match = re.search(r'\$tool_calls\s*\n(\[.*?\])\s*\n\$', text, re.DOTALL)
+        if not match:
+            logger.error("Failed to extract tool call JSON")
+            return None
+        
+        tool_calls_json = match.group(1)
+        tool_calls = json.loads(tool_calls_json)
+        
+        for tool_call in tool_calls:
+            function_name = tool_call.get("function")
+            args = tool_call.get("args", {})
+            
+            if function_name not in TOOL_REGISTRY:
+                logger.error(f"Unknown function: {function_name}")
+                continue
+            
+            func = TOOL_REGISTRY[function_name]
+            
+            # Execute the function (handle both sync and async)
+            import asyncio
+            if asyncio.iscoroutinefunction(func):
+                # If we're in an async context, we need to run it properly
+                # For now, create a task to run it
+                asyncio.create_task(execute_tool_async(func, args, function_name))
+            else:
+                result = func(**args)
+                logger.info(f"\e[47m[TOOL]\e[0m {function_name} returned: {result}")
+                
+    except json.JSONDecodeError as e:
+        logger.error(f"[TOOL] JSON parsing error: {e}")
+    except Exception as e:
+        logger.error(f"[TOOL] Error executing tool: {e}", exc_info=True)
+
+
+async def execute_tool_async(func, args, function_name):
+    """Helper to execute async tool functions"""
+    try:
+        result = await func(**args)
+        logger.info(f"\033[47m\033[4;30m[TOOL]\033[0m {function_name} returned: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"[TOOL] Error in async tool execution: {e}", exc_info=True)
 
 
 class Assistant(Agent):
@@ -129,7 +195,11 @@ async def entrypoint(ctx: JobContext):
     @session.on("conversation_item_added")
     def _on_conversation_item_added(event: ConversationItemAddedEvent):
         logger.info(f"\033[38;5;208mConversation item added: {event.item.role} - {event.item.content}\033[0m")   
-        logger.info(f"\033[35mRoles so far: {[item.role for item in session.history.items]}\033[0m")    
+        logger.info(f"\033[35mRoles so far: {[item.role for item in session.history.items]}\033[0m")
+        
+        # Detect and execute tool calls
+        if event.item.role == "assistant":
+            parse_and_execute_tool_calls(event.item.content)    
 
     assistant = Assistant(instructions=SYSTEM_PROMPT, tools=[search_and_respond, get_weather])
     await session.start(
