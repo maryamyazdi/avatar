@@ -16,6 +16,9 @@ from livekit.agents import (
     WorkerOptions,
     AgentStateChangedEvent,
     ConversationItemAddedEvent,
+    BackgroundAudioPlayer,
+    AudioConfig,
+    BuiltinAudioClip,
     cli,
 )
 from livekit.plugins import openai, silero, simli
@@ -103,7 +106,6 @@ async def parse_and_execute_tool_calls(content: str):
             else:
                 result = func(**args)
             
-            logger.info(f"\033[40m\033[0;37m[TOOL]\033[0m {function_name} returned: {result}")
             results.append(f"{function_name} returned: {result}")
         
         return "\n".join(results) if results else None
@@ -165,6 +167,12 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
         preemptive_generation=False,
     )
+    
+    background_audio = BackgroundAudioPlayer(
+        thinking_sound=AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=0.8)
+    )
+    
+    tool_executing = {"active": False, "audio_handle": None}
 
     @ctx.room.on("participant_connected")
     def on_participant_connected(participant):
@@ -188,14 +196,21 @@ async def entrypoint(ctx: JobContext):
             async def handle_tool_call():
                 result = await parse_and_execute_tool_calls(event.item.content)
                 if result:
+                    tool_executing["active"] = True
+                    tool_executing["audio_handle"] = background_audio.play(BuiltinAudioClip.KEYBOARD_TYPING, loop=True)
+                    
                     session.generate_reply(user_input=result)
+                    
+                    tool_executing["active"] = False
+                    if tool_executing["audio_handle"]:
+                        tool_executing["audio_handle"].stop()
+                        tool_executing["audio_handle"] = None
                     return result
             
             asyncio.create_task(handle_tool_call())    
 
     assistant = Assistant(instructions=SYSTEM_PROMPT, tools=[search_and_respond, get_weather])
-    
-    # Create Simli avatar configuration
+  
     simli_avatar = simli.AvatarSession(
                 simli_config=simli.SimliConfig(
                     api_key=SIMLI_API_KEY,
@@ -203,8 +218,10 @@ async def entrypoint(ctx: JobContext):
                 ),
             )
     
-    # Start avatar and session concurrently for faster initialization
-    # The agent will be ready immediately while avatar loads in background
+    await ctx.connect()
+    
+    await background_audio.start(room=ctx.room, agent_session=session)
+    
     await asyncio.gather(
         simli_avatar.start(session, room=ctx.room),
         session.start(

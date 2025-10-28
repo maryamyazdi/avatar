@@ -25,7 +25,7 @@ async def search_and_respond(query: str, knowledge_base_ids:  List[str] = ["76eb
         knowledge_base_ids: List of knowledge base UUIDs to search.
     """
 
-    payload = {"query": query, "knowledge_store_uuids": knowledge_base_ids}
+    payload = {"query": query, "knowledge_store_uuids": knowledge_base_ids, "top_k": 5}
 
     try:
         # Call the RAG API to get the full prompt
@@ -39,7 +39,7 @@ async def search_and_respond(query: str, knowledge_base_ids:  List[str] = ["76eb
                 # Get the complete prompt from RAG API
                 response_data = await response.json()
                 
-                rag_prompt = response_data.get("text")
+                rag_prompt = response_data.get("prompt")
 
                 if not rag_prompt:
                     logger.error(f"[RAG] API response missing 'prompt' key.")
