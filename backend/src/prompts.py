@@ -46,3 +46,17 @@ Say: "This topic is a bit complex. Well, there are several factors involved. Let
 
 IMPORTANT: KEEP YOUR RESPONSE SHORT AND BORING.
 """
+
+
+TOOL_RESULTS_PROMPT = f"""
+The user has asked a question and you have used a tool to answer it. Here is the user's question:
+
+
+
+Use the tool results to answer the user's question naturally and conversationally.
+
+IMPORTANT: KEEP YOUR RESPONSE SHORT AND BORING.
+{results}
+
+IMPORTANT: KEEP YOUR RESPONSE SHORT AND BORING.
+"""

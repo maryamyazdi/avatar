@@ -2,6 +2,7 @@ import logging
 import os
 import json
 import re
+import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -23,7 +24,7 @@ from plugins.kokoro_tts import KokoroTTS
 
 from tools import get_weather, search_and_respond
 
-from system_prompt import SYSTEM_PROMPT
+from prompts import SYSTEM_PROMPT
 
 logger = logging.getLogger("Agent")
 
@@ -63,7 +64,7 @@ VAD_MAX_BUFFERED_SPEECH = os.getenv("VAD_MAX_BUFFERED_SPEECH", "30.0")
 
 
 
-def parse_and_execute_tool_calls(content: str):
+async def parse_and_execute_tool_calls(content: str):
     """
     Detects tool calls in format: $tool_calls [...] $
     """
@@ -75,6 +76,7 @@ def parse_and_execute_tool_calls(content: str):
     if not text.startswith("$tool_calls"):
         return None
     
+    results = []
     try:
         # Extract JSON array from the pattern: $tool_calls\n[...]\n$
         match = re.search(r'\$tool_calls\s*\n(\[.*?\])\s*\n\$', text, re.DOTALL)
@@ -95,30 +97,23 @@ def parse_and_execute_tool_calls(content: str):
             
             func = TOOL_REGISTRY[function_name]
             
-            # Execute the function (handle both sync and async)
-            import asyncio
+            # Handle async functions
             if asyncio.iscoroutinefunction(func):
-                # If we're in an async context, we need to run it properly
-                # For now, create a task to run it
-                asyncio.create_task(execute_tool_async(func, args, function_name))
+                result = await func(**args)
             else:
                 result = func(**args)
-                logger.info(f"\e[47m[TOOL]\e[0m {function_name} returned: {result}")
+            
+            logger.info(f"\e[47m[TOOL]\e[0m {function_name} returned: {result}")
+            results.append(f"{function_name} returned: {result}")
+        
+        return "\n".join(results) if results else None
                 
     except json.JSONDecodeError as e:
         logger.error(f"[TOOL] JSON parsing error: {e}")
     except Exception as e:
         logger.error(f"[TOOL] Error executing tool: {e}", exc_info=True)
-
-
-async def execute_tool_async(func, args, function_name):
-    """Helper to execute async tool functions"""
-    try:
-        result = await func(**args)
-        logger.info(f"\033[47m\033[4;30m[TOOL]\033[0m {function_name} returned: {result}")
-        return result
-    except Exception as e:
-        logger.error(f"[TOOL] Error in async tool execution: {e}", exc_info=True)
+    
+    return None
 
 
 class Assistant(Agent):
@@ -199,7 +194,21 @@ async def entrypoint(ctx: JobContext):
         
         # Detect and execute tool calls
         if event.item.role == "assistant":
-            parse_and_execute_tool_calls(event.item.content)    
+            async def handle_tool_call():
+                result = await parse_and_execute_tool_calls(event.item.content)
+                if result:
+                    logger.info(f"Tool execution result: {result}")
+                return result
+            
+            # task = asyncio.create_task(handle_tool_call())
+            
+            # def on_task_done(future):
+            #     try:
+            #         result = future.result()
+            #     except Exception as e:
+            #         logger.error(f"Tool call failed: {e}")
+            
+            # task.add_done_callback(on_task_done)    
 
     assistant = Assistant(instructions=SYSTEM_PROMPT, tools=[search_and_respond, get_weather])
     await session.start(
