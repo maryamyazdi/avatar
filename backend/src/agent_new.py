@@ -103,7 +103,7 @@ async def parse_and_execute_tool_calls(content: str):
             else:
                 result = func(**args)
             
-            logger.info(f"\e[47m[TOOL]\e[0m {function_name} returned: {result}")
+            logger.info(f"\033[40m\033[0;37m[TOOL]\033[0m {function_name} returned: {result}")
             results.append(f"{function_name} returned: {result}")
         
         return "\n".join(results) if results else None
@@ -166,15 +166,6 @@ async def entrypoint(ctx: JobContext):
         preemptive_generation=False,
     )
 
-    simli_avatar = simli.AvatarSession(
-                simli_config=simli.SimliConfig(
-                    api_key=SIMLI_API_KEY,
-                    face_id=SIMLI_FACE_ID,
-                ),
-            )
-
-    await simli_avatar.start(session, room=ctx.room)
-
     @ctx.room.on("participant_connected")
     def on_participant_connected(participant):
         logger.info(f"Participant connected: {participant.identity}")
@@ -189,7 +180,7 @@ async def entrypoint(ctx: JobContext):
 
     @session.on("conversation_item_added")
     def _on_conversation_item_added(event: ConversationItemAddedEvent):
-        logger.info(f"\033[38;5;208m {event.item.role} : {event.item.content}\033[0m")   
+        logger.info(f"\033[38;5;208m{event.item.role} : {event.item.content}\033[0m")   
         logger.info(f"\033[35mRoles so far: {[item.role for item in session.history.items]}\033[0m")
         
         # Detect and execute tool calls
@@ -197,18 +188,31 @@ async def entrypoint(ctx: JobContext):
             async def handle_tool_call():
                 result = await parse_and_execute_tool_calls(event.item.content)
                 if result:
-                    logger.info(f"Tool execution result: {result}")
                     session.generate_reply(user_input=result)
                     return result
             
             asyncio.create_task(handle_tool_call())    
 
     assistant = Assistant(instructions=SYSTEM_PROMPT, tools=[search_and_respond, get_weather])
-    await session.start(
-        agent=assistant,
-        room=ctx.room,
-        room_input_options=RoomInputOptions(),
-        room_output_options=RoomOutputOptions(),
+    
+    # Create Simli avatar configuration
+    simli_avatar = simli.AvatarSession(
+                simli_config=simli.SimliConfig(
+                    api_key=SIMLI_API_KEY,
+                    face_id=SIMLI_FACE_ID,
+                ),
+            )
+    
+    # Start avatar and session concurrently for faster initialization
+    # The agent will be ready immediately while avatar loads in background
+    await asyncio.gather(
+        simli_avatar.start(session, room=ctx.room),
+        session.start(
+            agent=assistant,
+            room=ctx.room,
+            room_input_options=RoomInputOptions(),
+            room_output_options=RoomOutputOptions(),
+        )
     )
 
 if __name__ == "__main__":
