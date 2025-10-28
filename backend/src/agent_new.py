@@ -73,7 +73,7 @@ async def parse_and_execute_tool_calls(content: str):
     
     text = content[0] if isinstance(content[0], str) else str(content[0])
     
-    if not text.startswith("$tool_calls"):
+    if "$tool_calls" not in text:
         return None
     
     results = []
@@ -189,7 +189,7 @@ async def entrypoint(ctx: JobContext):
 
     @session.on("conversation_item_added")
     def _on_conversation_item_added(event: ConversationItemAddedEvent):
-        logger.info(f"\033[38;5;208mConversation item added: {event.item.role} - {event.item.content}\033[0m")   
+        logger.info(f"\033[38;5;208m {event.item.role} : {event.item.content}\033[0m")   
         logger.info(f"\033[35mRoles so far: {[item.role for item in session.history.items]}\033[0m")
         
         # Detect and execute tool calls
@@ -198,17 +198,10 @@ async def entrypoint(ctx: JobContext):
                 result = await parse_and_execute_tool_calls(event.item.content)
                 if result:
                     logger.info(f"Tool execution result: {result}")
-                return result
+                    session.generate_reply(user_input=result)
+                    return result
             
-            # task = asyncio.create_task(handle_tool_call())
-            
-            # def on_task_done(future):
-            #     try:
-            #         result = future.result()
-            #     except Exception as e:
-            #         logger.error(f"Tool call failed: {e}")
-            
-            # task.add_done_callback(on_task_done)    
+            asyncio.create_task(handle_tool_call())    
 
     assistant = Assistant(instructions=SYSTEM_PROMPT, tools=[search_and_respond, get_weather])
     await session.start(
