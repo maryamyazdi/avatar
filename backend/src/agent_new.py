@@ -24,6 +24,7 @@ from livekit.agents import (
 from livekit.plugins import openai, silero, simli
 from plugins.whisper_stt import WhisperEndpointSTT
 from plugins.kokoro_tts import KokoroTTS
+from plugins.piper_tts import PiperTTS
 
 from tools import get_weather, search_and_respond
 
@@ -55,6 +56,8 @@ KOKORO_BASE_URL = os.getenv("KOKORO_BASE_URL")
 KOKORO_DEFAULT_VOICE = os.getenv("KOKORO_DEFAULT_VOICE")
 KOKORO_DEFAULT_SPEED = os.getenv("KOKORO_DEFAULT_SPEED")
 
+PIPER_BASE_URL = os.getenv("PIPER_BASE_URL")
+
 # Simli Avatar Configuration
 SIMLI_API_KEY = os.getenv("SIMLI_API_KEY")
 SIMLI_FACE_ID = os.getenv("SIMLI_FACE_ID")
@@ -71,13 +74,10 @@ async def parse_and_execute_tool_calls(content: str):
     """
     Detects tool calls in format: $tool_calls [...] $
     """
-    if not isinstance(content, list) or len(content) == 0:
+    if len(content) == 0:
         return None
     
     text = content[0] if isinstance(content[0], str) else str(content[0])
-    
-    if "$tool_calls" not in text:
-        return None
     
     results = []
     try:
@@ -90,25 +90,31 @@ async def parse_and_execute_tool_calls(content: str):
         tool_calls_json = match.group(1)
         tool_calls = json.loads(tool_calls_json)
         
-        for tool_call in tool_calls:
-            function_name = tool_call.get("function")
-            args = tool_call.get("args", {})
+        if tool_calls:
+            for tool_call in tool_calls:
+                function_name = tool_call.get("function")
+                args = tool_call.get("args", {})
+                
+                # Validate tool call structure
+                if not function_name or not isinstance(function_name, str):
+                    logger.warning(f"Invalid tool call - missing or invalid function name: {tool_call}")
+                    continue
+                
+                if function_name not in TOOL_REGISTRY:
+                    logger.error(f"Unknown function: {function_name}")
+                    continue
+                
+                func = TOOL_REGISTRY[function_name]
+                
+                # Handle async functions
+                if asyncio.iscoroutinefunction(func):
+                    result = await func(**args)
+                else:
+                    result = func(**args)
+                
+                results.append(f"{function_name} returned: {result}")
             
-            if function_name not in TOOL_REGISTRY:
-                logger.error(f"Unknown function: {function_name}")
-                continue
-            
-            func = TOOL_REGISTRY[function_name]
-            
-            # Handle async functions
-            if asyncio.iscoroutinefunction(func):
-                result = await func(**args)
-            else:
-                result = func(**args)
-            
-            results.append(f"{function_name} returned: {result}")
-        
-        return "\n".join(results) if results else None
+            return "\n".join(results) if results else None
                 
     except json.JSONDecodeError as e:
         logger.error(f"[TOOL] JSON parsing error: {e}")
@@ -137,13 +143,19 @@ def prewarm(proc: JobProcess):
             api_key="dummy",
             tool_choice="auto",
         )
-    proc.userdata["tts"] = KokoroTTS(
-            base_url=KOKORO_BASE_URL,
-            voice=KOKORO_DEFAULT_VOICE,
-            speed=KOKORO_DEFAULT_SPEED,
-            buffer_sentences=True,
-            flush_timeout=1.5,
-            inter_chunk_pause=1,
+    # Kokoro TTS (Old - Commented Out)
+    # proc.userdata["tts"] = KokoroTTS(
+    #         base_url=KOKORO_BASE_URL,
+    #         voice=KOKORO_DEFAULT_VOICE,
+    #         speed=KOKORO_DEFAULT_SPEED,
+    #         buffer_sentences=True,
+    #         flush_timeout=1.5,
+    #         inter_chunk_pause=1,
+    #     )
+    
+    proc.userdata["tts"] = PiperTTS(
+            base_url=PIPER_BASE_URL,
+            sample_rate=22050,
         )
     proc.userdata["vad"] = silero.VAD.load(
         min_speech_duration=float(VAD_MIN_SPEECH_DURATION),
@@ -194,19 +206,19 @@ async def entrypoint(ctx: JobContext):
         # Detect and execute tool calls
         if event.item.role == "assistant":
             async def handle_tool_call():
-                result = await parse_and_execute_tool_calls(event.item.content)
-                if result:
-                    tool_executing["active"] = True
-                    tool_executing["audio_handle"] = background_audio.play(BuiltinAudioClip.KEYBOARD_TYPING, loop=True)
-                    
-                    session.generate_reply(user_input=result)
-                    
-                    tool_executing["active"] = False
-                    if tool_executing["audio_handle"]:
-                        tool_executing["audio_handle"].stop()
-                        tool_executing["audio_handle"] = None
-                    return result
-            
+                if "$tool_calls" in event.item.content:
+                    result = await parse_and_execute_tool_calls(event.item.content)
+                    if result:
+                        tool_executing["active"] = True
+                        tool_executing["audio_handle"] = background_audio.play(BuiltinAudioClip.KEYBOARD_TYPING2, loop=True)
+                        
+                        session.generate_reply(user_input=result)
+                        
+                        tool_executing["active"] = False
+                        if tool_executing["audio_handle"]:
+                            tool_executing["audio_handle"].stop()
+                            tool_executing["audio_handle"] = None
+                        return result
             asyncio.create_task(handle_tool_call())    
 
     assistant = Assistant(instructions=SYSTEM_PROMPT, tools=[search_and_respond, get_weather])
