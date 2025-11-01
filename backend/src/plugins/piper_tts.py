@@ -116,7 +116,6 @@ class PiperTTSChunkedStream(tts.ChunkedStream):
             
             stripped_text = text_to_synthesize.strip()
             if not stripped_text:
-                logger.debug("Skipping empty text after truncation")
                 # Push minimal silence to satisfy the emitter
                 silence = b'\x00\x00' * 100  # 100 samples of silence
                 output_emitter.push(silence)
@@ -162,7 +161,6 @@ class PiperTTSChunkedStream(tts.ChunkedStream):
                         if data_chunk:
                             all_audio_data += data_chunk
                             chunk_count += 1
-                    logger.debug(f"Received {chunk_count} chunks, {len(all_audio_data)} total bytes")
                 except (httpcore.RemoteProtocolError, httpx.RemoteProtocolError) as e:
                     # Handle incomplete chunked reads
                     if len(all_audio_data) > 0:
@@ -192,8 +190,6 @@ class PiperTTSChunkedStream(tts.ChunkedStream):
                     body=None,
                 )
             
-            # Push the complete audio data as bytes
-            logger.debug(f"Successfully received {len(all_audio_data)} bytes from Piper TTS")
             output_emitter.push(all_audio_data)
             
             # Flush the emitter to indicate completion
