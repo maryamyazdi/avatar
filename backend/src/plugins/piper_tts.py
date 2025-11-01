@@ -106,24 +106,35 @@ class PiperTTSChunkedStream(tts.ChunkedStream):
             )
             emitter_initialized = True
             
-            stripped_text = self.input_text.strip()
+            # Truncate text at tool calls marker if present
+            # This allows us to synthesize the actual response text before tool calls
+            text_to_synthesize = self.input_text
+            if "$tool_calls" in text_to_synthesize:
+                # Find the position of $tool_calls and truncate before it
+                tool_calls_pos = text_to_synthesize.find("$tool_calls")
+                text_to_synthesize = text_to_synthesize[:tool_calls_pos].strip()
+            
+            stripped_text = text_to_synthesize.strip()
             if not stripped_text:
-                logger.debug("Skipping empty text")
+                logger.debug("Skipping empty text after truncation")
+                # Push minimal silence to satisfy the emitter
+                silence = b'\x00\x00' * 100  # 100 samples of silence
+                output_emitter.push(silence)
+                output_emitter.flush()
                 return
             
             # Skip synthesis for punctuation-only text
             if stripped_text in ['.', ',', '!', '?', ';', ':', '\n', '\r\n']:
-                logger.info(f"[SKIP] Skipping synthesis for punctuation-only text: '{self.input_text}'")
-                return
-            
-            # Skip if this looks like tool calls JSON - check for common patterns
-            if "$tool_calls" in stripped_text or "```tool_calls" in stripped_text or ('"function"' in stripped_text and '"args"' in stripped_text):
-                logger.info(f"[SKIP] Skipping synthesis for tool calls JSON: '{stripped_text[:50]}...'")
+                logger.info(f"[SKIP] Skipping synthesis for punctuation-only text: '{stripped_text}'")
+                # Push minimal silence to satisfy the emitter
+                silence = b'\x00\x00' * 100  # 100 samples of silence
+                output_emitter.push(silence)
+                output_emitter.flush()
                 return
 
             all_audio_data = b""
             
-            request_payload = {"text": self.input_text}
+            request_payload = {"text": stripped_text}  # Use truncated text
             
             async with self._tts._client.stream(
                 'POST',

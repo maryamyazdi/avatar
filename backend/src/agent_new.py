@@ -188,7 +188,7 @@ async def entrypoint(ctx: JobContext):
 
     @session.on("conversation_item_added")
     def _on_conversation_item_added(event: ConversationItemAddedEvent):
-        logger.info(f"\033[38;5;208m{event.item.role} : {event.item.content}\033[0m")   
+        logger.info(f"\033[38;5;208m{event.item.role} : {event.item.content[0]}\033[0m")   
         logger.info(f"\033[35mRoles so far: {[item.role for item in session.history.items]}\033[0m")
         
         # Detect and execute tool calls
