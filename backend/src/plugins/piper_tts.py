@@ -93,16 +93,11 @@ class PiperTTSChunkedStream(tts.ChunkedStream):
         """
         Generate audio using Piper TTS and emit through the output emitter.
         """
-        stripped_text = self.input_text.strip()
-        if not stripped_text:
-            logger.debug("Skipping empty text")
-            return
-        
         request_id = utils.shortuuid()
         emitter_initialized = False
         
         try:
-            # Initialize output emitter
+            # Always initialize output emitter first
             output_emitter.initialize(
                 request_id=request_id,
                 sample_rate=self._tts._sample_rate,
@@ -110,6 +105,21 @@ class PiperTTSChunkedStream(tts.ChunkedStream):
                 mime_type="audio/pcm",
             )
             emitter_initialized = True
+            
+            stripped_text = self.input_text.strip()
+            if not stripped_text:
+                logger.debug("Skipping empty text")
+                return
+            
+            # Skip synthesis for punctuation-only text
+            if stripped_text in ['.', ',', '!', '?', ';', ':', '\n', '\r\n']:
+                logger.info(f"[SKIP] Skipping synthesis for punctuation-only text: '{self.input_text}'")
+                return
+            
+            # Skip if this looks like tool calls JSON - check for common patterns
+            if "$tool_calls" in stripped_text or "```tool_calls" in stripped_text or ('"function"' in stripped_text and '"args"' in stripped_text):
+                logger.info(f"[SKIP] Skipping synthesis for tool calls JSON: '{stripped_text[:50]}...'")
+                return
 
             all_audio_data = b""
             

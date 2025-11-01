@@ -1,4 +1,5 @@
 import logging
+from math import log
 import os
 import json
 import re
@@ -16,9 +17,6 @@ from livekit.agents import (
     WorkerOptions,
     AgentStateChangedEvent,
     ConversationItemAddedEvent,
-    BackgroundAudioPlayer,
-    AudioConfig,
-    BuiltinAudioClip,
     cli,
 )
 from livekit.plugins import openai, silero, simli
@@ -68,6 +66,7 @@ VAD_MIN_SILENCE_DURATION = os.getenv("VAD_MIN_SILENCE_DURATION", "0.5")
 VAD_PREFIX_PADDING = os.getenv("VAD_PREFIX_PADDING", "0.2")
 VAD_MAX_BUFFERED_SPEECH = os.getenv("VAD_MAX_BUFFERED_SPEECH", "30.0")
 
+TOOL_CALL_PATTERN = re.compile(r'\$tool_calls\s*\n(\[.*?\])\s*\n\$', re.DOTALL)
 
 
 async def parse_and_execute_tool_calls(content: str):
@@ -76,16 +75,11 @@ async def parse_and_execute_tool_calls(content: str):
     """
     if len(content) == 0:
         return None
-    
-    text = content[0] if isinstance(content[0], str) else str(content[0])
-    
+   
     results = []
     try:
         # Extract JSON array from the pattern: $tool_calls\n[...]\n$
-        match = re.search(r'\$tool_calls\s*\n(\[.*?\])\s*\n\$', text, re.DOTALL)
-        if not match:
-            logger.error("Failed to extract tool call JSON")
-            return None
+        match = TOOL_CALL_PATTERN.search(content)
         
         tool_calls_json = match.group(1)
         tool_calls = json.loads(tool_calls_json)
@@ -143,7 +137,7 @@ def prewarm(proc: JobProcess):
             api_key="dummy",
             tool_choice="auto",
         )
-    # Kokoro TTS (Old - Commented Out)
+    # Kokoro TTS
     # proc.userdata["tts"] = KokoroTTS(
     #         base_url=KOKORO_BASE_URL,
     #         voice=KOKORO_DEFAULT_VOICE,
@@ -179,12 +173,6 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
         preemptive_generation=False,
     )
-    
-    background_audio = BackgroundAudioPlayer(
-        thinking_sound=AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=0.8)
-    )
-    
-    tool_executing = {"active": False, "audio_handle": None}
 
     @ctx.room.on("participant_connected")
     def on_participant_connected(participant):
@@ -205,21 +193,14 @@ async def entrypoint(ctx: JobContext):
         
         # Detect and execute tool calls
         if event.item.role == "assistant":
-            async def handle_tool_call():
-                if "$tool_calls" in event.item.content:
-                    result = await parse_and_execute_tool_calls(event.item.content)
+            response = event.item.content[0] if isinstance(event.item.content[0], str) else str(event.item.content[0])
+            if "$tool_calls" in response:
+                async def handle_tool_call():
+                    result = await parse_and_execute_tool_calls(response)
                     if result:
-                        tool_executing["active"] = True
-                        tool_executing["audio_handle"] = background_audio.play(BuiltinAudioClip.KEYBOARD_TYPING2, loop=True)
-                        
                         session.generate_reply(user_input=result)
-                        
-                        tool_executing["active"] = False
-                        if tool_executing["audio_handle"]:
-                            tool_executing["audio_handle"].stop()
-                            tool_executing["audio_handle"] = None
                         return result
-            asyncio.create_task(handle_tool_call())    
+                asyncio.create_task(handle_tool_call())    
 
     assistant = Assistant(instructions=SYSTEM_PROMPT, tools=[search_and_respond, get_weather])
   
@@ -231,8 +212,6 @@ async def entrypoint(ctx: JobContext):
             )
     
     await ctx.connect()
-    
-    await background_audio.start(room=ctx.room, agent_session=session)
     
     await asyncio.gather(
         simli_avatar.start(session, room=ctx.room),
