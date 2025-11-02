@@ -17,6 +17,9 @@ from livekit.agents import (
     WorkerOptions,
     AgentStateChangedEvent,
     ConversationItemAddedEvent,
+    ChatContext,
+    FunctionTool,
+    ModelSettings,
     cli,
 )
 from livekit.plugins import openai, silero, simli
@@ -125,6 +128,30 @@ class Assistant(Agent):
                 tools=tools
         )
 
+    async def llm_node(
+        self, chat_ctx: ChatContext, tools: list[FunctionTool], model_settings: ModelSettings
+    ):
+        """
+        Override llm_node to intercept messages before they reach the LLM.
+        This allows us to detect and merge two consecutive user messages.
+        """
+        if len(chat_ctx.items) >= 2:
+            last_message = chat_ctx.items[-1]
+            second_last_message = chat_ctx.items[-2]
+            
+            if last_message.role == "user" and second_last_message.role == "user":
+                last_content = last_message.content[0]
+                second_last_content = second_last_message.content[0]
+
+                merged_content = f"{second_last_content}{' '}{last_content}"
+                last_message.content[0] = merged_content
+                chat_ctx.items.pop(-2)
+                logger.warning("Merged consecutive user messages.")
+                
+        # Call the default LLM node to proceed with normal processing
+        async for chunk in Agent.default.llm_node(self, chat_ctx, tools, model_settings):
+            yield chunk
+
 
 def prewarm(proc: JobProcess):
     proc.userdata["stt"] = WhisperEndpointSTT(
@@ -200,7 +227,7 @@ async def entrypoint(ctx: JobContext):
                     if result:
                         session.generate_reply(user_input=result)
                         return result
-                asyncio.create_task(handle_tool_call())    
+                asyncio.create_task(handle_tool_call())
 
     assistant = Assistant(instructions=SYSTEM_PROMPT, tools=[search_and_respond, get_weather])
   
