@@ -1,5 +1,4 @@
 import logging
-from math import log
 import os
 import json
 import re
@@ -46,7 +45,6 @@ TOOL_REGISTRY = {
 
 # Speech-to-Text (Whisper) Configuration
 WHISPER_BASE_URL = os.getenv("WHISPER_BASE_URL")
-WHISPER_LANGUAGE = os.getenv("WHISPER_LANGUAGE")
 
 # Large Language Model (LLM) Configuration
 LLM_BASE_URL = os.getenv("LLM_BASE_URL")
@@ -68,6 +66,8 @@ VAD_MIN_SPEECH_DURATION = os.getenv("VAD_MIN_SPEECH_DURATION", "0.1")
 VAD_MIN_SILENCE_DURATION = os.getenv("VAD_MIN_SILENCE_DURATION", "0.5")
 VAD_PREFIX_PADDING = os.getenv("VAD_PREFIX_PADDING", "0.2")
 VAD_MAX_BUFFERED_SPEECH = os.getenv("VAD_MAX_BUFFERED_SPEECH", "30.0")
+
+LANGUAGE = os.getenv("LANGUAGE")
 
 TOOL_CALL_PATTERN = re.compile(r'\$tool_calls\s*\n(\[.*?\])\s*\n\$', re.DOTALL)
 
@@ -156,7 +156,7 @@ class Assistant(Agent):
 def prewarm(proc: JobProcess):
     proc.userdata["stt"] = WhisperEndpointSTT(
             api_url=WHISPER_BASE_URL,
-            language=WHISPER_LANGUAGE
+            language=LANGUAGE,
         )
     proc.userdata["llm"] = openai.LLM(
             model=LLM_MODEL,
@@ -164,20 +164,20 @@ def prewarm(proc: JobProcess):
             api_key="dummy",
             tool_choice="auto",
         )
-    # Kokoro TTS
-    # proc.userdata["tts"] = KokoroTTS(
-    #         base_url=KOKORO_BASE_URL,
-    #         voice=KOKORO_DEFAULT_VOICE,
-    #         speed=KOKORO_DEFAULT_SPEED,
-    #         buffer_sentences=True,
-    #         flush_timeout=1.5,
-    #         inter_chunk_pause=1,
-    #     )
-    
-    proc.userdata["tts"] = PiperTTS(
-            base_url=PIPER_BASE_URL,
-            sample_rate=22050,
-        )
+    if LANGUAGE == "en":
+        proc.userdata["tts"] = KokoroTTS(
+                base_url=KOKORO_BASE_URL,
+                voice=KOKORO_DEFAULT_VOICE,
+                speed=KOKORO_DEFAULT_SPEED,
+                buffer_sentences=True,
+                flush_timeout=1.5,
+                inter_chunk_pause=1,
+            )
+    elif LANGUAGE == "fa":
+        proc.userdata["tts"] = PiperTTS(
+                base_url=PIPER_BASE_URL,
+                sample_rate=22050,
+            )
     proc.userdata["vad"] = silero.VAD.load(
         min_speech_duration=float(VAD_MIN_SPEECH_DURATION),
         min_silence_duration=float(VAD_MIN_SILENCE_DURATION),
@@ -216,7 +216,8 @@ async def entrypoint(ctx: JobContext):
     @session.on("conversation_item_added")
     def _on_conversation_item_added(event: ConversationItemAddedEvent):
         logger.info(f"\033[38;5;208m{event.item.role} : {event.item.content[0]}\033[0m")   
-        logger.info(f"\033[35mRoles so far: {[item.role for item in session.history.items]}\033[0m")
+        items_to_show = session.history.items[-6:] if len(session.history.items) > 6 else session.history.items
+        logger.info(f"\033[35mRoles so far: {[item.role for item in items_to_show]}\033[0m")
         
         # Detect and execute tool calls
         if event.item.role == "assistant":

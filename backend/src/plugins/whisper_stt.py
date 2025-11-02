@@ -3,8 +3,7 @@ import io
 import logging
 import wave
 import aiohttp
-from typing import Optional, AsyncIterator, Union
-from dotenv import load_dotenv
+from typing import Optional, AsyncIterator
 from livekit.agents import (
     stt,
     utils,
@@ -71,7 +70,7 @@ class WhisperEndpointSTT(stt.STT):
         self, 
         buffer: AudioBuffer, 
         *, 
-        language: Optional[str] = "en",
+        language: Optional[str] = None,
         conn_options = None,
     ) -> stt.SpeechEvent:
         """
@@ -79,7 +78,6 @@ class WhisperEndpointSTT(stt.STT):
         
         Args:
             buffer: Audio buffer containing the audio data
-            language: Optional language override
             
         Returns:
             SpeechEvent with transcription results
@@ -92,10 +90,10 @@ class WhisperEndpointSTT(stt.STT):
             wav_data = await self._buffer_to_wav(merged_buffer)
             
             # Send to Whisper endpoint
-            result = await self._transcribe_audio(wav_data, language)
+            result = await self._transcribe_audio(wav_data)
             
             # Parse and return result
-            return await self._parse_transcription_result(result, language)
+            return await self._parse_transcription_result(result)
             
         except Exception as e:
             logger.error(f"Error in Whisper endpoint recognition: {e}")
@@ -105,7 +103,7 @@ class WhisperEndpointSTT(stt.STT):
         self,
         buffer: AsyncIterator,
         *,
-        language: Optional[str] = "en",
+        language: Optional[str] = None,
         conn_options = None,
     ) -> AsyncIterator[stt.SpeechEvent]:
         """
@@ -113,7 +111,6 @@ class WhisperEndpointSTT(stt.STT):
         
         Args:
             buffer: Async iterator of audio frames
-            language: Optional language override
             conn_options: Connection options (unused)
             
         Yields:
@@ -135,10 +132,10 @@ class WhisperEndpointSTT(stt.STT):
                         
                         # Convert to WAV and transcribe
                         wav_data = await self._buffer_to_wav(chunk_buffer)
-                        result = await self._transcribe_audio(wav_data, language)
+                        result = await self._transcribe_audio(wav_data)
                         
                         # Parse result and yield as interim transcript
-                        event = await self._parse_transcription_result(result, language, is_interim=True)
+                        event = await self._parse_transcription_result(result, is_interim=True)
                         if self._has_meaningful_content(event):
                             yield event
                         
@@ -162,9 +159,9 @@ class WhisperEndpointSTT(stt.STT):
                 try:
                     final_buffer = utils.merge_frames(audio_frames)
                     wav_data = await self._buffer_to_wav(final_buffer)
-                    result = await self._transcribe_audio(wav_data, language)
+                    result = await self._transcribe_audio(wav_data)
                     
-                    event = await self._parse_transcription_result(result, language, is_interim=False)
+                    event = await self._parse_transcription_result(result, is_interim=False)
                     if self._has_meaningful_content(event):
                         yield event
                         
@@ -197,15 +194,13 @@ class WhisperEndpointSTT(stt.STT):
 
     async def _transcribe_audio(
         self, 
-        audio_data: bytes, 
-        language: Optional[str] = "en"
+        audio_data: bytes
     ) -> dict:
         """
         Send audio to Whisper endpoint for transcription
         
         Args:
             audio_data: WAV format audio data
-            language: Optional language code
             
         Returns:
             API response dictionary
@@ -221,6 +216,9 @@ class WhisperEndpointSTT(stt.STT):
                 filename='audio.wav', 
                 content_type='audio/wav'
             )
+            
+            # Add language parameter from instance
+            data.add_field('language', self._language)
             
             # Use the single file transcription endpoint
             # url = f"{self._api_url}/transcribe_single/"
@@ -254,7 +252,6 @@ class WhisperEndpointSTT(stt.STT):
     async def _parse_transcription_result(
         self, 
         result: dict, 
-        language: Optional[str] = "en",
         is_interim: bool = False
     ) -> stt.SpeechEvent:
         """
@@ -262,7 +259,6 @@ class WhisperEndpointSTT(stt.STT):
         
         Args:
             result: API response dictionary
-            language: Language code
             is_interim: Whether this is an interim result
             
         Returns:
@@ -294,10 +290,10 @@ class WhisperEndpointSTT(stt.STT):
                 else stt.SpeechEventType.FINAL_TRANSCRIPT
             )
             
-            # Create speech data
+            # Create speech data with instance language
             speech_data = stt.SpeechData(
                 text=text,
-                language=language or self._language or "auto"
+                language=self._language
             )
             
             logger.info(f"Transcribed ({'interim' if is_interim else 'final'}): {text}")
