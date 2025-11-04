@@ -67,8 +67,6 @@ VAD_MIN_SILENCE_DURATION = os.getenv("VAD_MIN_SILENCE_DURATION", "0.5")
 VAD_PREFIX_PADDING = os.getenv("VAD_PREFIX_PADDING", "0.2")
 VAD_MAX_BUFFERED_SPEECH = os.getenv("VAD_MAX_BUFFERED_SPEECH", "30.0")
 
-LANGUAGE = os.getenv("LANGUAGE")
-
 TOOL_CALL_PATTERN = re.compile(r'\$tool_calls\s*\n(\[.*?\])\s*\n\$', re.DOTALL)
 
 
@@ -128,64 +126,91 @@ class Assistant(Agent):
                 tools=tools
         )
 
-    async def llm_node(
-        self, chat_ctx: ChatContext, tools: list[FunctionTool], model_settings: ModelSettings
-    ):
-        """
-        Override llm_node to intercept messages before they reach the LLM.
-        This allows us to detect and merge two consecutive user messages.
-        """
-        if len(chat_ctx.items) >= 2:
-            last_message = chat_ctx.items[-1]
-            second_last_message = chat_ctx.items[-2]
+    # async def llm_node(
+    #     self, chat_ctx: ChatContext, tools: list[FunctionTool], model_settings: ModelSettings
+    # ):
+    #     """
+    #     Override llm_node to intercept messages before they reach the LLM.
+    #     This allows us to detect and merge two consecutive user messages.
+    #     """
+    #     if len(chat_ctx.items) >= 2:
+    #         last_message = chat_ctx.items[-1]
+    #         second_last_message = chat_ctx.items[-2]
             
-            if last_message.role == "user" and second_last_message.role == "user":
-                last_content = last_message.content[0]
-                second_last_content = second_last_message.content[0]
+    #         if last_message.role == "user" and second_last_message.role == "user":
+    #             last_content = last_message.content[0]
+    #             second_last_content = second_last_message.content[0]
 
-                merged_content = f"{second_last_content}{' '}{last_content}"
-                last_message.content[0] = merged_content
-                chat_ctx.items.pop(-2)
-                logger.warning("Merged consecutive user messages.")
+    #             merged_content = f"{second_last_content}{' '}{last_content}"
+
+    #             logger.warning(f"chat_ctx before deleting:{[item.role for item in chat_ctx.items]}")
+            
+    #             chat_ctx.items.pop(-2)
+    #             chat_ctx.items[-1].content[0] = merged_content
+    #             logger.info(f"\033[36m [LLM node] Last message:{chat_ctx.items[-1].content[0]}\033[0m")
+
+    #             logger.warning(f"chat_ctx after deleting:{[item.role for item in chat_ctx.items]}")
                 
-        # Call the default LLM node to proceed with normal processing
-        async for chunk in Agent.default.llm_node(self, chat_ctx, tools, model_settings):
-            yield chunk
+    #     # Call the default LLM node to proceed with normal processing
+    #     async for chunk in Agent.default.llm_node(self, chat_ctx, tools, model_settings):
+    #         yield chunk
+
+
+    # async def transcription_node(self, session: AgentSession, user_msg: str):
+    #     """
+    #     Override transcription_node to check for consecutive user messages
+    #     and merge them BEFORE adding to history.
+    #     """
+    #     # Check if the last message in history is from the user
+    #     if len(session.history.items) > 0 and session.history.items[-1].role == "user":
+    #         if session.history.items[-2].role == "user":
+    #             session.history.items.pop(-1)
+    #             session.history.items[-1].content[0] = f"{session.history.items[-1].content[0]} {user_msg}"
+    #             logger.warning(f"\033[0;33mMerged consecutive user input: '{session.history.items[-1].content[0]}' + '{user_msg}' = '{session.history.items[-1].content[0]}'\033[0m")
+    #             logger.info(f"\033[36m [transcription_node] Last message:{session.history.items[-1].content[0]}\033[0m")
+    #             return session.history.items[-1].content[0]
+    #         else:
+    #             session.history.items.append(ConversationItemAddedEvent(role="user", content=[user_msg]))
+    #             return user_msg
+        
+    #     # If not consecutive, process normally
+    #     return await Agent.default.transcription_node(self, session, user_msg)
 
 
 def prewarm(proc: JobProcess):
-    proc.userdata["stt"] = WhisperEndpointSTT(
-            api_url=WHISPER_BASE_URL,
-            language=LANGUAGE,
-        )
     proc.userdata["llm"] = openai.LLM(
             model=LLM_MODEL,
             base_url=LLM_BASE_URL,
             api_key="dummy",
             tool_choice="auto",
         )
-    if LANGUAGE == "en":
-        proc.userdata["tts"] = KokoroTTS(
-                base_url=KOKORO_BASE_URL,
-                voice=KOKORO_DEFAULT_VOICE,
-                speed=KOKORO_DEFAULT_SPEED,
-                buffer_sentences=True,
-                flush_timeout=1.5,
-                inter_chunk_pause=1,
-            )
-    elif LANGUAGE == "fa":
-        proc.userdata["tts"] = PiperTTS(
-                base_url=PIPER_BASE_URL,
-                sample_rate=22050,
-            )
     proc.userdata["vad"] = silero.VAD.load(
         min_speech_duration=float(VAD_MIN_SPEECH_DURATION),
         min_silence_duration=float(VAD_MIN_SILENCE_DURATION),
         prefix_padding_duration=float(VAD_PREFIX_PADDING),
         max_buffered_speech=float(VAD_MAX_BUFFERED_SPEECH),
     )
+    
+    proc.userdata["tts_factory"] = {
+        "en": lambda: KokoroTTS(
+                base_url=KOKORO_BASE_URL,
+                voice=KOKORO_DEFAULT_VOICE,
+                speed=KOKORO_DEFAULT_SPEED,
+                buffer_sentences=True,
+                flush_timeout=1.5,
+                inter_chunk_pause=1,
+            ),
+        "fa": lambda: PiperTTS(
+                base_url=PIPER_BASE_URL,
+                sample_rate=22050,
+            )
+    }
+    proc.userdata["stt_factory"] = lambda lang: WhisperEndpointSTT(
+            api_url=WHISPER_BASE_URL,
+            language=lang,
+        )
 
-    logger.info("[OK] STT, LLM, TTS, and VAD loaded.")
+    logger.info("[OK] LLM and VAD prewarmed. STT/TTS will be initialized based on participant language.")
 
 
 async def entrypoint(ctx: JobContext):
@@ -193,10 +218,31 @@ async def entrypoint(ctx: JobContext):
         "room": ctx.room.name,
     }
 
+    # Connect to the room first
+    await ctx.connect()
+    
+    # Wait for participant to connect to get their language preference
+    participant = await ctx.wait_for_participant()
+    
+    # Extract language from participant metadata
+    try:
+        if participant.metadata:
+            metadata = json.loads(participant.metadata)
+            language = metadata.get("language", os.getenv("LANGUAGE", "en"))
+            logger.info(f"Participant language preference: {language}")
+    except Exception as e:
+        logger.warning(f"Failed to parse participant metadata, using default language: {e}")
+    
+    # Initialize STT and TTS based on participant's language
+    stt = ctx.proc.userdata["stt_factory"](language)
+    tts = ctx.proc.userdata["tts_factory"].get(language, ctx.proc.userdata["tts_factory"]["en"])()
+    
+    logger.info(f"Initialized agent with language: {language}")
+
     session = AgentSession(
-        stt=ctx.proc.userdata["stt"],
+        stt=stt,
         llm=ctx.proc.userdata["llm"],
-        tts=ctx.proc.userdata["tts"],
+        tts=tts,
         vad=ctx.proc.userdata["vad"],
         preemptive_generation=False,
     )
@@ -215,9 +261,17 @@ async def entrypoint(ctx: JobContext):
 
     @session.on("conversation_item_added")
     def _on_conversation_item_added(event: ConversationItemAddedEvent):
-        logger.info(f"\033[38;5;208m{event.item.role} : {event.item.content[0]}\033[0m")   
+        # session.history = assistant.chat_ctx
+        logger.info(f"\033[38;5;208m{event.item.role} : {event.item.content[0]}\033[0m")
         items_to_show = session.history.items[-6:] if len(session.history.items) > 6 else session.history.items
         logger.info(f"\033[35mRoles so far: {[item.role for item in items_to_show]}\033[0m")
+
+        if event.item.role == "user" and len(session.history.items) >= 2:
+            if session.history.items[-2].role == "user":
+                session.history.items.pop(-1)
+                items_to_show = session.history.items[-6:] if len(session.history.items) > 6 else session.history.items
+                logger.info(f"\033[35mRoles so far after merging: {[item.role for item in items_to_show]}\033[0m")
+                logger.info(f"\033[36m [on_conversation_item_added] Last message:{session.history.items[-1].content[0]}\033[0m")
         
         # Detect and execute tool calls
         if event.item.role == "assistant":
@@ -229,6 +283,32 @@ async def entrypoint(ctx: JobContext):
                         session.generate_reply(user_input=result)
                         return result
                 asyncio.create_task(handle_tool_call())
+    
+    @session.on("error")
+    def _on_error(error):
+        """Simple error handler - just reset conversation and continue."""
+        logger.error(f"Session error: {error}", exc_info=True)
+        
+        # For any LLM error, reset conversation to system message
+        if error.type == "llm_error":
+            logger.warning(f"Problematic history: {[item.role for item in session.history.items]}")
+            
+            try:
+                # Keep only system message
+                system_msg = None
+                for item in session.history.items:
+                    if item.role == "system":
+                        system_msg = item
+                        break
+                
+                session.history.items.clear()
+                if system_msg:
+                    session.history.items.append(system_msg)
+                
+                logger.info("Conversation reset - ready for new interaction")
+                
+            except Exception as e:
+                logger.error(f"Failed to reset: {e}")
 
     assistant = Assistant(instructions=SYSTEM_PROMPT, tools=[search_and_respond, get_weather])
   
@@ -236,10 +316,12 @@ async def entrypoint(ctx: JobContext):
                 simli_config=simli.SimliConfig(
                     api_key=SIMLI_API_KEY,
                     face_id=SIMLI_FACE_ID,
+                    max_session_length=600,
+                    max_idle_time=600, 
                 ),
             )
     
-    await ctx.connect()
+    # ctx.connect() already called above - no need to call again
     
     await asyncio.gather(
         simli_avatar.start(session, room=ctx.room),
