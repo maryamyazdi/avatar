@@ -9,7 +9,7 @@ RAG_API_URL = "https://ml.demisco.ai/api/chat/"
 logger = logging.getLogger("RAG")
 
 @function_tool
-async def search_and_respond(query: str, knowledge_base_ids:  List[str] = ["76eb9478-0bbe-4116-952e-51c0c541f0b4"]) -> str:
+async def search_and_respond(query: str, knowledge_base_ids:  List[str] = ["c9e90cbb-437d-43f9-ad04-6bbeac42b449"]) -> str:
     """
     Search the knowledge base and answer questions about Demis products, medical reference systems,
     invoicing, features, documentation, or any company-specific information.
