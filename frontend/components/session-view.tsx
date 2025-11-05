@@ -201,7 +201,7 @@ export const SessionView = ({
                 },
               }}
               aria-hidden={messages.length > 0}
-              className="absolute bottom-4 left-0 right-0 z-10 text-center text-xs text-muted-foreground"
+              className="absolute bottom-[140px] left-0 right-0 z-10 text-center text-xs text-muted-foreground"
             >
               <p className="animate-text-shimmer inline-block !bg-clip-text font-semibold text-transparent">
                 {isLoading
@@ -231,6 +231,9 @@ export const SessionView = ({
             capabilities={capabilities}
             onChatOpenChange={setChatOpen}
             onSendMessage={handleSendMessage}
+            showMessageInput={!chatOpen && sessionStarted}
+            messageInputDisabled={!isAgentAvailable(agentState) || isLoading}
+            messageInputPlaceholder="Type your message ..."
           />
         </motion.div>
       </section>
@@ -326,6 +329,9 @@ export const SessionView = ({
               capabilities={capabilities}
               onChatOpenChange={setChatOpen}
               onSendMessage={handleSendMessage}
+              showMessageInput={!chatOpen && sessionStarted}
+              messageInputDisabled={!isAgentAvailable(agentState) || isLoading}
+              messageInputPlaceholder="Type your message ..."
             />
           </div>
           {/* skrim */}

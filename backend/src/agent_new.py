@@ -27,7 +27,7 @@ from plugins.piper_tts import PiperTTS
 
 from tools import get_weather, search_and_respond
 
-from prompts import SYSTEM_PROMPT
+from prompts import SYSTEM_PROMPT_PERSIAN, SYSTEM_PROMPT_ENGLISH
 
 logger = logging.getLogger("Agent")
 
@@ -63,7 +63,7 @@ SIMLI_FACE_ID = os.getenv("SIMLI_FACE_ID")
 VAD_MIN_SPEECH_DURATION = os.getenv("VAD_MIN_SPEECH_DURATION", "0.1")
 VAD_MIN_SILENCE_DURATION = os.getenv("VAD_MIN_SILENCE_DURATION", "0.5")
 VAD_PREFIX_PADDING = os.getenv("VAD_PREFIX_PADDING", "0.2")
-VAD_MAX_BUFFERED_SPEECH = os.getenv("VAD_MAX_BUFFERED_SPEECH", "60.0")
+VAD_MAX_BUFFERED_SPEECH = os.getenv("VAD_MAX_BUFFERED_SPEECH", "30.0")
 
 TOOL_CALL_PATTERN = re.compile(r'\$tool_calls\s*\n(\[.*?\])\s*\n\$', re.DOTALL)
 
@@ -211,6 +211,42 @@ async def entrypoint(ctx: JobContext):
     def on_participant_disconnected(participant):
         logger.info(f"Participant disconnected: {participant.identity}")
 
+    @ctx.room.on("data_received")
+    def on_data_received(data_packet):
+        """Handle data messages from frontend (e.g., text input from MessageInput component)"""
+        try:
+            # Decode the data packet
+            data_str = data_packet.data.decode('utf-8')
+            logger.info(f"Received data message: {data_str}")
+            
+            # Check if this is from the lk.chat topic (MessageInput component)
+            if data_packet.topic == "lk.chat":
+                # Parse the JSON message from MessageInput
+                message_data = json.loads(data_str)
+                user_message = message_data.get("message", "").strip()
+                
+                if user_message:
+                    logger.info(f"\033[38;5;46m[TEXT INPUT] User: {user_message}\033[0m")
+                    # Generate reply using the session
+                    session.generate_reply(user_input=user_message)
+                else:
+                    logger.warning("Received empty message from lk.chat topic")
+            else:
+                # Handle other data topics (like voice config)
+                try:
+                    config_data = json.loads(data_str)
+                    if config_data.get("type") == "voice_config":
+                        voice = config_data.get("voice")
+                        logger.info(f"Voice configuration received: {voice}")
+                        # Voice config is handled elsewhere, just log it
+                except json.JSONDecodeError:
+                    logger.warning(f"Received non-JSON data on topic {data_packet.topic}: {data_str}")
+                    
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse data message as JSON: {e}")
+        except Exception as e:
+            logger.error(f"Error handling data message: {e}", exc_info=True)
+
     @session.on("agent_state_changed")
     def _on_agent_state_changed(event: AgentStateChangedEvent):
         logger.info(f"Agent state changed: {event.old_state} -> {event.new_state}")
@@ -226,7 +262,9 @@ async def entrypoint(ctx: JobContext):
                     session.generate_reply(user_input=result)
             asyncio.create_task(handle_tool_call())
 
-    assistant = Assistant(instructions=SYSTEM_PROMPT, tools=[search_and_respond])
+    # Select system prompt based on language
+    system_prompt = SYSTEM_PROMPT_PERSIAN if language == "fa" else SYSTEM_PROMPT_ENGLISH
+    assistant = Assistant(instructions=system_prompt, tools=[search_and_respond])
   
     simli_avatar = simli.AvatarSession(
                 simli_config=simli.SimliConfig(

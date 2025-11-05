@@ -22,6 +22,8 @@ import {
   UseAgentControlBarProps,
   useAgentControlBar,
 } from "./hooks/use-agent-control-bar";
+import { LanguageBadge } from "@/components/language-badge";
+import { MessageInput } from "../message-input";
 
 export interface AgentControlBarProps
   extends React.HTMLAttributes<HTMLDivElement>,
@@ -34,6 +36,9 @@ export interface AgentControlBarProps
   onSendMessage?: (message: string) => Promise<void>;
   onDisconnect?: () => void;
   onDeviceError?: (error: { source: Track.Source; error: Error }) => void;
+  showMessageInput?: boolean;
+  messageInputDisabled?: boolean;
+  messageInputPlaceholder?: string;
 }
 
 /**
@@ -48,6 +53,9 @@ export function AgentControlBar({
   onChatOpenChange,
   onDisconnect,
   onDeviceError,
+  showMessageInput = false,
+  messageInputDisabled = false,
+  messageInputPlaceholder = "Type your message ...",
   ...props
 }: AgentControlBarProps) {
   const participants = useRemoteParticipants();
@@ -103,7 +111,7 @@ export function AgentControlBar({
       )}
       {...props}
     >
-      <div className="flex flex-row justify-between gap-1">
+      <div className="flex flex-row items-center justify-between gap-2">
         <div className="flex gap-1">
           {visibleControls.microphone && (
             <Tooltip content="Microphone" side="top">
@@ -150,36 +158,6 @@ export function AgentControlBar({
             </Tooltip>
           )}
 
-          {capabilities.supportsVideoInput && visibleControls.camera && (
-            <Tooltip content="Camera" side="top">
-              <div className="flex items-center gap-0">
-                <TrackToggle
-                  variant="primary"
-                  source={Track.Source.Camera}
-                  pressed={cameraToggle.enabled}
-                  pending={cameraToggle.pending}
-                  disabled={cameraToggle.pending}
-                  onPressedChange={cameraToggle.toggle}
-                  className="peer/track relative w-auto rounded-r-none pr-3 pl-3 disabled:opacity-100 md:border-r-0 md:pr-2"
-                />
-                <hr className="bg-separator1 peer-data-[state=off]/track:bg-separatorSerious relative z-10 -mr-px hidden h-4 w-px md:block" />
-                <DeviceSelect
-                  size="sm"
-                  kind="videoinput"
-                  requestPermissions={false}
-                  onMediaDeviceError={onCameraDeviceSelectError}
-                  onActiveDeviceChange={handleVideoDeviceChange}
-                  className={cn([
-                    "pl-2",
-                    "peer-data-[state=off]/track:text-destructive-foreground",
-                    "hover:text-fg1 focus:text-fg1",
-                    "hover:peer-data-[state=off]/track:text-destructive-foreground focus:peer-data-[state=off]/track:text-destructive-foreground",
-                    "rounded-l-none",
-                  ])}
-                />
-              </div>
-            </Tooltip>
-          )}
 
           {visibleControls.chat && (
             <Tooltip content="Chat History" side="top">
@@ -196,18 +174,34 @@ export function AgentControlBar({
             </Tooltip>
           )}
         </div>
-        {visibleControls.leave && (
-          <Button
-            variant="destructive"
-            onClick={onLeave}
-            disabled={isDisconnecting}
-            className="font-mono"
-          >
-            <PhoneDisconnectIcon weight="bold" />
-            <span className="hidden md:inline">END CALL</span>
-            <span className="inline md:hidden">END</span>
-          </Button>
+
+        {/* Message Input - Inline Mode */}
+        {showMessageInput && onSendMessage && (
+          <MessageInput
+            inline
+            onSend={onSendMessage}
+            disabled={messageInputDisabled}
+            placeholder={messageInputPlaceholder}
+            showInputField={true}
+            className="flex-1"
+          />
         )}
+
+        <div className="flex items-center gap-2">
+          <LanguageBadge />
+          {visibleControls.leave && (
+            <Button
+              variant="destructive"
+              onClick={onLeave}
+              disabled={isDisconnecting}
+              className="font-mono"
+            >
+              <PhoneDisconnectIcon weight="bold" />
+              <span className="hidden md:inline">END CALL</span>
+              <span className="inline md:hidden">END</span>
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

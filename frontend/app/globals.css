@@ -378,4 +378,69 @@
   .nav-link:hover::after {
     width: 100%;
   }
+
+  /* Material Design 3 Message Input Enhancements */
+  @keyframes ripple {
+    0% {
+      transform: scale(0);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(4);
+      opacity: 0;
+    }
+  }
+
+  @keyframes slideInUp {
+    from {
+      transform: translateY(30px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes focusPulse {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(102, 155, 209, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 4px rgba(102, 155, 209, 0.1);
+    }
+  }
+
+  .animate-slideInUp {
+    animation: slideInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  .animate-focusPulse {
+    animation: focusPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Smooth input transitions */
+  input[type="text"]:focus {
+    animation: focusPulse 2s ease-in-out;
+  }
+
+  /* Custom scrollbar for message areas */
+  .message-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .message-scroll::-webkit-scrollbar-track {
+    background: var(--bg2);
+    border-radius: 4px;
+  }
+
+  .message-scroll::-webkit-scrollbar-thumb {
+    background: var(--separator1);
+    border-radius: 4px;
+    transition: background 0.3s ease;
+  }
+
+  .message-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--separator2);
+  }
 }
