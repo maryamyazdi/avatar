@@ -9,6 +9,7 @@ import useChatAndTranscription from "@/hooks/useChatAndTranscription";
 import { useDebugMode } from "@/hooks/useDebug";
 import type { AppConfig } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/use-translation";
 import {
   type AgentState,
   type ReceivedChatMessage,
@@ -49,6 +50,7 @@ export const SessionView = ({
   const { messages, send } = useChatAndTranscription();
   const room = useRoomContext();
   const [isLoading, setIsLoading] = useState(false);
+  const { t, isRTL } = useTranslation();
 
   // Track if user is speaking (agent is listening)
   const isUserSpeaking = agentState === "listening";
@@ -85,15 +87,15 @@ export const SessionView = ({
         if (!isAgentAvailable(agentState)) {
           const reason =
             agentState === "connecting"
-              ? "Agent did not join the room. "
-              : "Agent connected but did not complete initializing. ";
+              ? t("AGENT_CONNECTION_FAILED")
+              : t("AGENT_INIT_FAILED");
 
           toastAlert({
-            title: "Session ended",
+            title: t("SESSION_ENDED"),
             description: (
               <p className="w-full">
                 {reason}
-                Please try again or check your connection.
+                {t("CONNECTION_ERROR")}
               </p>
             ),
           });
@@ -115,11 +117,13 @@ export const SessionView = ({
 
   if (isPopupMode) {
     return (
-      <section
-        ref={ref}
-        inert={disabled}
-        className="relative flex h-full w-full flex-col overflow-hidden"
-      >
+    <section
+      ref={ref}
+      inert={disabled}
+      className="relative flex h-full w-full flex-col overflow-hidden"
+      dir={isRTL ? "rtl" : "ltr"}
+      lang={isRTL ? "fa" : "en"}
+    >
         {/* Content Area */}
         <div className="relative flex flex-1 flex-col overflow-hidden">
           {/* Chat Messages - only shown when chatOpen */}
@@ -205,8 +209,8 @@ export const SessionView = ({
             >
               <p className="animate-text-shimmer inline-block !bg-clip-text font-semibold text-transparent">
                 {isLoading
-                  ? "Initializing a new session..."
-                  : "Agent is listening, ask it a question and start going!"}
+                  ? t("SESSION_INITIALIZING")
+                  : t("AGENT_LISTENING")}
               </p>
             </motion.div>
           )}
@@ -233,7 +237,7 @@ export const SessionView = ({
             onSendMessage={handleSendMessage}
             showMessageInput={!chatOpen && sessionStarted}
             messageInputDisabled={!isAgentAvailable(agentState) || isLoading}
-            messageInputPlaceholder="Type your message ..."
+            messageInputPlaceholder={t("MESSAGE_PLACEHOLDER")}
           />
         </motion.div>
       </section>
@@ -250,6 +254,8 @@ export const SessionView = ({
         // when !chatOpen due to 'translate-y-20'
         !chatOpen && "max-h-svh overflow-hidden",
       )}
+      dir={isRTL ? "rtl" : "ltr"}
+      lang={isRTL ? "fa" : "en"}
     >
       <ChatMessageView
         className={cn(
@@ -319,8 +325,8 @@ export const SessionView = ({
               >
                 <p className="animate-text-shimmer inline-block !bg-clip-text text-sm font-semibold text-transparent">
                   {isLoading
-                    ? "Initializing a new session..."
-                    : "Agent is listening, ask it a question and start going!"}
+                    ? t("SESSION_INITIALIZING")
+                    : t("AGENT_LISTENING")}
                 </p>
               </motion.div>
             )}
@@ -331,7 +337,7 @@ export const SessionView = ({
               onSendMessage={handleSendMessage}
               showMessageInput={!chatOpen && sessionStarted}
               messageInputDisabled={!isAgentAvailable(agentState) || isLoading}
-              messageInputPlaceholder="Type your message ..."
+              messageInputPlaceholder={t("MESSAGE_PLACEHOLDER")}
             />
           </div>
           {/* skrim */}

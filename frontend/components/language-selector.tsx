@@ -3,6 +3,7 @@
 import { useLanguage, type Language } from "@/lib/language-context";
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
+import { useTranslation } from "@/lib/use-translation";
 
 const FLAGS = {
   fa: "/flag-iran.svg",
@@ -16,6 +17,7 @@ const LABELS = {
 
 export function LanguageSelector() {
   const { language, setLanguage } = useLanguage();
+  const { t } = useTranslation();
 
   const toggleLanguage = () => {
     setLanguage(language === "fa" ? "en" : "fa");
@@ -30,7 +32,7 @@ export function LanguageSelector() {
       }}
       whileHover={{ scale: 1.08 }}
       whileTap={{ scale: 0.95 }}
-      aria-label={`Switch to ${language === "fa" ? "English" : "Persian"}`}
+      aria-label={language === "fa" ? t("SWITCH_TO_ENGLISH") : t("SWITCH_TO_PERSIAN")}
     >
       <motion.div
         className="flex items-center justify-center w-3.5 h-3.5 rounded-sm overflow-hidden"

@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SessionView } from "./session-view";
 import { LanguageSelector } from "./language-selector";
 import { useLanguage } from "@/lib/language-context";
+import { useTranslation } from "@/lib/use-translation";
 
 // 🔄 Shared pulse animation for avatar + speech bubble
 const pulseSync = {
@@ -80,6 +81,7 @@ export function FloatingBot({ appConfig }: { appConfig: AppConfig }) {
     appConfig.defaultTTSVoice || "",
   );
   const { language } = useLanguage();
+  const { t, isRTL } = useTranslation();
   const { refreshConnectionDetails, existingOrRefreshConnectionDetails } =
     useConnectionDetails(appConfig, language);
 
@@ -91,7 +93,7 @@ export function FloatingBot({ appConfig }: { appConfig: AppConfig }) {
     };
     const onMediaDevicesError = (error: Error) => {
       toastAlert({
-        title: "Encountered an error with your media devices",
+        title: t("MEDIA_DEVICES_ERROR"),
         description: `${error.name}: ${error.message}`,
       });
     };
@@ -121,7 +123,7 @@ export function FloatingBot({ appConfig }: { appConfig: AppConfig }) {
       ]).catch((error) => {
         if (aborted) return;
         toastAlert({
-          title: "There was an error connecting to the agent",
+          title: t("CONNECTION_ERROR_TITLE"),
           description: `${error.name}: ${error.message}`,
         });
       });
@@ -201,8 +203,10 @@ export function FloatingBot({ appConfig }: { appConfig: AppConfig }) {
               }}
               animate={pulseSync.animate}
               transition={pulseSync.transition}
+              dir={isRTL ? "rtl" : "ltr"}
+              lang={isRTL ? "fa" : "en"}
             >
-              <span className="relative z-10">Have any questions?</span>
+              <span className="relative z-10">{t("HAVE_QUESTIONS")}</span>
               {/* 🟢 Speech Bubble Corner */}
               <div
                 className="absolute bottom-[-8px] right-4 w-0 h-0"
@@ -234,7 +238,7 @@ export function FloatingBot({ appConfig }: { appConfig: AppConfig }) {
               }}
               animate={!isOpen ? pulseSync.animate : {}}
               transition={pulseSync.transition}
-              aria-label={isOpen ? "Close chat" : "Open chat"}
+              aria-label={isOpen ? t("CLOSE_CHAT") : t("OPEN_CHAT")}
             >
               <AnimatePresence mode="wait" initial={false}>
                 {isOpen ? (

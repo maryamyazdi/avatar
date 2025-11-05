@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { APP_CONFIG_DEFAULTS } from "@/app-config";
 import { ApplyThemeScript, ThemeToggle } from "@/components/theme-toggle";
 import { LanguageProvider } from "@/lib/language-context";
+import { LayoutWrapper } from "@/components/layout-wrapper";
 import { getAppConfig } from "@/lib/utils";
 import "./globals.css";
 
@@ -76,6 +77,10 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         <meta name="description" content={pageDescription} />
         <link rel="icon" type="image/png" href="/demis2.png" />
         <link rel="apple-touch-icon" href="/demis2.png" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;200;300;400;500;600;700;800;900&display=swap"
+          rel="stylesheet"
+        />
         <ApplyThemeScript />
       </head>
       <body
@@ -83,10 +88,12 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         style={{ fontFamily: "var(--font-poppins), sans-serif" }}
       >
         <LanguageProvider>
-          {children}
-          <div className="group fixed bottom-0 left-1/2 z-50 mb-2 -translate-x-1/2">
-            <ThemeToggle className="translate-y-20 transition-transform delay-150 duration-300 group-hover:translate-y-0" />
-          </div>
+          <LayoutWrapper>
+            {children}
+            <div className="group fixed bottom-0 left-1/2 z-50 mb-2 -translate-x-1/2">
+              <ThemeToggle className="translate-y-20 transition-transform delay-150 duration-300 group-hover:translate-y-0" />
+            </div>
+          </LayoutWrapper>
         </LanguageProvider>
       </body>
     </html>

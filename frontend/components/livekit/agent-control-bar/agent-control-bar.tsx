@@ -9,6 +9,7 @@ import {
   BarVisualizer,
   useRemoteParticipants,
 } from "@livekit/components-react";
+import { useTranslation } from "@/lib/use-translation";
 import {
   ChatTextIcon,
   PhoneDisconnectIcon,
@@ -60,6 +61,7 @@ export function AgentControlBar({
 }: AgentControlBarProps) {
   const participants = useRemoteParticipants();
   const [chatOpen, setChatOpen] = React.useState(false);
+  const { t, isRTL } = useTranslation();
 
   const isAgentAvailable = participants.some((p) => p.isAgent);
 
@@ -104,17 +106,29 @@ export function AgentControlBar({
 
   return (
     <div
-      aria-label="Voice assistant controls"
+      aria-label={t("VOICE_ASSISTANT_CONTROLS")}
       className={cn(
         "bg-background border-bg2 dark:border-separator1 flex flex-col rounded-[31px] border p-3 drop-shadow-md/3",
+        // Force LTR layout for consistent toolbar structure
+        "toolbar-ltr-layout",
         className,
       )}
+      style={{ direction: 'ltr' }}
       {...props}
     >
-      <div className="flex flex-row items-center justify-between gap-2">
-        <div className="flex gap-1">
+      <div className={cn(
+        "flex items-center justify-between gap-2",
+        // Force consistent layout order regardless of RTL
+        "flex-row"
+      )}>
+        {/* Left side controls - always on the left */}
+        <div className={cn(
+          "flex gap-1",
+          // Ensure consistent ordering within this group
+          "flex-row"
+        )}>
           {visibleControls.microphone && (
-            <Tooltip content="Microphone" side="top">
+            <Tooltip content={t("MICROPHONE")} side="top">
               <div className="flex items-center gap-0">
                 <TrackToggle
                   variant="primary"
@@ -158,12 +172,11 @@ export function AgentControlBar({
             </Tooltip>
           )}
 
-
           {visibleControls.chat && (
-            <Tooltip content="Chat History" side="top">
+            <Tooltip content={t("CHAT_HISTORY")} side="top">
               <Toggle
                 variant="secondary"
-                aria-label="Toggle chat"
+                aria-label={t("TOGGLE_CHAT")}
                 pressed={chatOpen}
                 onPressedChange={setChatOpen}
                 disabled={!isAgentAvailable}
@@ -175,30 +188,36 @@ export function AgentControlBar({
           )}
         </div>
 
-        {/* Message Input - Inline Mode */}
+        {/* Message Input - Center */}
         {showMessageInput && onSendMessage && (
           <MessageInput
             inline
             onSend={onSendMessage}
             disabled={messageInputDisabled}
-            placeholder={messageInputPlaceholder}
+            placeholder={messageInputPlaceholder || t("MESSAGE_PLACEHOLDER")}
             showInputField={true}
             className="flex-1"
           />
         )}
 
-        <div className="flex items-center gap-2">
+        {/* Right side controls - always on the right */}
+        <div className={cn(
+          "flex items-center gap-2",
+          // Ensure consistent ordering within this group
+          "flex-row"
+        )}>
           <LanguageBadge />
           {visibleControls.leave && (
             <Button
               variant="destructive"
               onClick={onLeave}
               disabled={isDisconnecting}
-              className="font-mono"
+              className={cn("font-mono", isRTL && "font-sans")}
+              dir={isRTL ? "rtl" : "ltr"}
             >
               <PhoneDisconnectIcon weight="bold" />
-              <span className="hidden md:inline">END CALL</span>
-              <span className="inline md:hidden">END</span>
+              <span className="hidden md:inline">{t("END_CALL")}</span>
+              <span className="inline md:hidden">{t("END_CALL_SHORT")}</span>
             </Button>
           )}
         </div>

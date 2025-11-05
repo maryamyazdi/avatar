@@ -3,6 +3,146 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* RTL Support for Persian Language */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+/* Ensure input placeholders are properly aligned in RTL */
+[dir="rtl"] input::placeholder {
+  text-align: right;
+}
+
+/* Maintain button and icon positioning in RTL */
+[dir="rtl"] .flex-row-reverse {
+  flex-direction: row-reverse;
+}
+
+/* Force consistent flex direction for toolbar elements */
+.flex-row {
+  flex-direction: row !important;
+}
+
+/* Prevent RTL from affecting specific layout elements - use higher specificity */
+html[dir="rtl"] .flex-row,
+[dir="rtl"] .flex-row {
+  flex-direction: row !important;
+}
+
+/* Ensure justify-between works consistently in RTL */
+html[dir="rtl"] .justify-between,
+[dir="rtl"] .justify-between {
+  justify-content: space-between !important;
+}
+
+/* Ensure items-center works consistently in RTL */
+html[dir="rtl"] .items-center,
+[dir="rtl"] .items-center {
+  align-items: center !important;
+}
+
+/* Toolbar LTR Layout Override */
+.toolbar-ltr-layout {
+  direction: ltr !important;
+}
+
+/* Ensure all flex containers within toolbar maintain LTR */
+.toolbar-ltr-layout .flex,
+.toolbar-ltr-layout .flex-row {
+  flex-direction: row !important;
+}
+
+/* Ensure justify and align properties work correctly in forced LTR */
+.toolbar-ltr-layout .justify-between {
+  justify-content: space-between !important;
+}
+
+.toolbar-ltr-layout .items-center {
+  align-items: center !important;
+}
+
+/* Allow specific elements within toolbar to be RTL for text content */
+.toolbar-ltr-layout button[dir="rtl"],
+.toolbar-ltr-layout input[dir="rtl"],
+.toolbar-ltr-layout span[dir="rtl"] {
+  direction: rtl !important;
+}
+
+/* Specific overrides for agent control bar to maintain layout consistency */
+html[dir="rtl"] [aria-label*="VOICE_ASSISTANT_CONTROLS"] .flex,
+html[dir="rtl"] [aria-label*="VOICE_ASSISTANT_CONTROLS"] .flex-row {
+  flex-direction: row !important;
+}
+
+/* Ensure toolbar container maintains LTR layout */
+html[dir="rtl"] [aria-label*="VOICE_ASSISTANT_CONTROLS"] {
+  direction: ltr !important;
+}
+
+/* But allow text content within buttons to be RTL */
+html[dir="rtl"] [aria-label*="VOICE_ASSISTANT_CONTROLS"] button[dir="rtl"],
+html[dir="rtl"] [aria-label*="VOICE_ASSISTANT_CONTROLS"] input[dir="rtl"] {
+  direction: rtl !important;
+}
+
+/* Persian font support with Vazirmatn */
+[lang="fa"], [dir="rtl"] {
+  font-family: "Vazirmatn", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+/* Override font-sans for Persian text */
+[lang="fa"] .font-sans, [dir="rtl"] .font-sans {
+  font-family: "Vazirmatn", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" !important;
+}
+
+/* Specific font weights for Persian text */
+[lang="fa"] .font-light, [dir="rtl"] .font-light {
+  font-weight: 300;
+}
+
+[lang="fa"] .font-normal, [dir="rtl"] .font-normal {
+  font-weight: 400;
+}
+
+[lang="fa"] .font-medium, [dir="rtl"] .font-medium {
+  font-weight: 500;
+}
+
+[lang="fa"] .font-semibold, [dir="rtl"] .font-semibold {
+  font-weight: 600;
+}
+
+[lang="fa"] .font-bold, [dir="rtl"] .font-bold {
+  font-weight: 700;
+}
+
+/* Better text rendering for Persian */
+[lang="fa"], [dir="rtl"] {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Improved line height for Persian text */
+[lang="fa"] p, [lang="fa"] span, [lang="fa"] div,
+[dir="rtl"] p, [dir="rtl"] span, [dir="rtl"] div {
+  line-height: 1.7;
+}
+
+/* Better letter spacing for Persian */
+[lang="fa"] .tracking-wide, [dir="rtl"] .tracking-wide {
+  letter-spacing: 0.025em;
+}
+
+[lang="fa"] .tracking-wider, [dir="rtl"] .tracking-wider {
+  letter-spacing: 0.05em;
+}
+
 :root {
   /* DemisCo Color Palette */
   --primary-red: #ef3b56;

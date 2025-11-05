@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { VoiceSelector } from "@/components/voice-selector";
 import { cn } from "@/lib/utils";
 import type { TTSVoice } from "@/lib/types";
+import { useTranslation } from "@/lib/use-translation";
 
 interface WelcomeProps {
   disabled: boolean;
@@ -21,6 +22,8 @@ export const Welcome = ({
   onVoiceChange,
   ref,
 }: React.ComponentProps<"div"> & WelcomeProps) => {
+  const { t, isRTL } = useTranslation();
+  
   return (
     <section
       ref={ref}
@@ -29,6 +32,8 @@ export const Welcome = ({
         "bg-background fixed inset-0 mx-auto flex h-svh flex-col items-center justify-center text-center",
         disabled ? "z-10" : "z-20",
       )}
+      dir={isRTL ? "rtl" : "ltr"}
+      lang={isRTL ? "fa" : "en"}
     >
       <svg
         width="64"
@@ -45,7 +50,7 @@ export const Welcome = ({
       </svg>
 
       <p className="text-fg1 max-w-prose pt-1 leading-6 font-medium">
-        Chat live with your voice AI agent
+        {t("WELCOME_TITLE")}
       </p>
 
       {ttsVoices.length > 0 && onVoiceChange && (
@@ -69,7 +74,7 @@ export const Welcome = ({
       </Button>
       <footer className="fixed bottom-5 left-0 z-20 flex w-full items-center justify-center">
         <p className="text-fg1 max-w-prose pt-1 text-xs leading-5 font-normal text-pretty md:text-sm">
-          Welcome! Click the button above to get started with your session.
+          {t("WELCOME_FOOTER")}
         </p>
       </footer>
     </section>

@@ -5,6 +5,7 @@ import { useRoomContext } from "@livekit/components-react";
 import { PaperPlaneRight } from "@phosphor-icons/react/dist/ssr";
 import { motion } from "motion/react";
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/lib/use-translation";
 
 interface MessageInputProps
   extends Omit<React.HTMLAttributes<HTMLFormElement>, "onSubmit"> {
@@ -29,6 +30,7 @@ export function MessageInput({
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const room = useRoomContext();
+  const { t, isRTL } = useTranslation();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -92,9 +94,14 @@ export function MessageInput({
       <form
         {...props}
         onSubmit={handleSubmit}
+        style={{ direction: 'ltr' }}
         className={cn(
           // Base container - compact for toolbar
           "relative flex flex-1 items-center gap-2 px-3 py-2",
+          // Force consistent flex direction
+          "flex-row",
+          // Force LTR layout for consistent structure
+          "toolbar-ltr-layout",
           // Rounded corners to match control bar
           "rounded-[24px]",
           // Background with dark theme support
@@ -121,6 +128,7 @@ export function MessageInput({
           onChange={handleChange}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
+          dir={isRTL ? "rtl" : "ltr"}
           className={cn(
             "flex-1 bg-transparent text-[#F9F8EB] placeholder:text-muted-foreground",
             "text-sm font-normal leading-relaxed",
@@ -152,7 +160,7 @@ export function MessageInput({
                   "shadow-none",
                 ]
           )}
-          aria-label="Send message"
+          aria-label={t("SEND_MESSAGE")}
         >
           {isSending ? (
             <div
@@ -181,6 +189,7 @@ export function MessageInput({
         duration: 0.3,
         ease: [0.4, 0, 0.2, 1],
       }}
+      dir={isRTL ? "rtl" : "ltr"}
       className={cn(
         // Base container
         "relative flex items-center gap-3 px-5 py-3",
@@ -249,7 +258,7 @@ export function MessageInput({
                 "shadow-none",
               ]
         )}
-        aria-label="Send message"
+        aria-label={t("SEND_MESSAGE")}
       >
         {isSending ? (
           <motion.div
