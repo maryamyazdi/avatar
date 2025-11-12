@@ -38,7 +38,8 @@ export const StaticAvatar = ({
       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent" />
 
       {/* Main content container */}
-      <div className="relative z-10 flex h-full w-full items-center justify-center">
+      {/* <div className="relative z-10 flex h-full w-full items-center justify-center"> */}
+      <div className="relative z-10 flex h-full w-full items-center justify-center bg-[url(/button-icon.png)] bg-cover bg-center">
         {/* Robot Icon */}
         <Robot
           weight="duotone"

@@ -205,7 +205,7 @@ export const SessionView = ({
                 },
               }}
               aria-hidden={messages.length > 0}
-              className="absolute bottom-[140px] left-0 right-0 z-10 text-center text-xs text-muted-foreground"
+              className="absolute bottom-[5rem] left-0 right-0 z-10 text-center text-xs text-muted-foreground"
             >
               <p className="animate-text-shimmer inline-block !bg-clip-text font-semibold text-transparent">
                 {isLoading
@@ -317,7 +317,7 @@ export const SessionView = ({
                 }}
                 aria-hidden={messages.length > 0}
                 className={cn(
-                  "absolute inset-x-0 -top-12 text-center",
+                  "absolute inset-x-0 -top-3 sm:-top-4 md:-top-6 lg:-top-12 text-center",
                   sessionStarted &&
                     messages.length === 0 &&
                     "pointer-events-none",
